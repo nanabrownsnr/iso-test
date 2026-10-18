@@ -43,6 +43,38 @@ async def health_endpoint(request: Request) -> JSONResponse:
 
 
 # ---------------------------------------------------------------------------
+# HTTP task summary endpoint
+# ---------------------------------------------------------------------------
+
+@mcp.custom_route("/api/v1/tasks/summary", methods=["GET"])
+async def tasks_summary_endpoint(request: Request) -> JSONResponse:
+    """HTTP endpoint returning task counts grouped by status.
+
+    Returns a JSON object with:
+      - total: total number of tasks
+      - by_status: counts grouped by status (todo, in_progress, done)
+      - by_priority: counts grouped by priority (low, medium, high)
+    """
+    storage = get_storage()
+    all_tasks = storage.get_all()
+
+    by_status: dict[str, int] = {}
+    by_priority: dict[str, int] = {}
+
+    for task in all_tasks.values():
+        status_key = task.status.value
+        priority_key = task.priority.value
+        by_status[status_key] = by_status.get(status_key, 0) + 1
+        by_priority[priority_key] = by_priority.get(priority_key, 0) + 1
+
+    return JSONResponse(content={
+        "total": len(all_tasks),
+        "by_status": by_status,
+        "by_priority": by_priority,
+    })
+
+
+# ---------------------------------------------------------------------------
 # Task management tools
 # ---------------------------------------------------------------------------
 
