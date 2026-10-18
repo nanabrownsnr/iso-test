@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import resource
+
 from fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -15,6 +18,8 @@ from .storage import get_storage
 
 mcp = FastMCP(name="fastmcp-server")
 
+SERVER_VERSION = "0.1.0"
+
 
 # ---------------------------------------------------------------------------
 # Existing tools (preserved for backward compatibility)
@@ -24,6 +29,50 @@ mcp = FastMCP(name="fastmcp-server")
 async def health_check() -> dict:
     """Return the health status of the server."""
     return {"status": "ok"}
+
+
+@mcp.tool()
+async def server_health() -> dict:
+    """Return detailed server health information including version, storage status, and registered tool count.
+
+    Returns:
+        A dict with ``status``, ``version``, ``storage_tasks_count``, and ``registered_tools_count``.
+    """
+    storage = get_storage()
+    tasks = storage.get_all()
+    tools = await mcp.list_tools()
+    return {
+        "status": "ok",
+        "version": SERVER_VERSION,
+        "storage_tasks_count": len(tasks),
+        "registered_tools_count": len(tools),
+    }
+
+
+@mcp.tool()
+async def system_health() -> dict:
+    """Return comprehensive system health information including process, memory, and storage diagnostics.
+
+    Returns:
+        A dict with ``status``, ``version``, ``pid``, ``storage_status``, ``storage_tasks_count``,
+        and ``memory_rss_bytes``.
+    """
+    storage = get_storage()
+    tasks = storage.get_all()
+    try:
+        usage = resource.getrusage(resource.RUSAGE_SELF)
+        memory_rss = usage.ru_maxrss * 1024
+    except OSError:
+        memory_rss = -1
+
+    return {
+        "status": "ok",
+        "version": SERVER_VERSION,
+        "pid": os.getpid(),
+        "storage_status": "connected",
+        "storage_tasks_count": len(tasks),
+        "memory_rss_bytes": memory_rss,
+    }
 
 
 @mcp.tool()
@@ -40,6 +89,32 @@ async def echo(message: str) -> dict:
 async def health_endpoint(request: Request) -> JSONResponse:
     """HTTP health check endpoint."""
     return JSONResponse(content={"status": "ok"})
+
+
+@mcp.custom_route("/healthz", methods=["GET"])
+async def healthz_endpoint(request: Request) -> JSONResponse:
+    """HTTP detailed health check endpoint with version and storage info."""
+    storage = get_storage()
+    tasks = storage.get_all()
+    return JSONResponse(content={
+        "status": "ok",
+        "version": SERVER_VERSION,
+        "storage_tasks_count": len(tasks),
+    })
+
+
+@mcp.custom_route("/readyz", methods=["GET"])
+async def readyz_endpoint(request: Request) -> JSONResponse:
+    """HTTP readiness probe endpoint for orchestration platforms."""
+    storage = get_storage()
+    tasks = storage.get_all()
+    return JSONResponse(content={
+        "status": "ready",
+        "version": SERVER_VERSION,
+        "pid": os.getpid(),
+        "storage_status": "connected",
+        "storage_tasks_count": len(tasks),
+    })
 
 
 # ---------------------------------------------------------------------------

@@ -42,6 +42,25 @@ class TestHTTPHealthEndpoint:
         response = client.delete("/health")
         assert response.status_code == 405
 
+    def test_healthz_endpoint_status_code(self, client):
+        """Test HTTP healthz endpoint returns 200."""
+        response = client.get("/healthz")
+        assert response.status_code == 200
+
+    def test_healthz_endpoint_response_body(self, client):
+        """Test HTTP healthz endpoint returns version and storage info."""
+        response = client.get("/healthz")
+        body = response.json()
+        assert body["status"] == "ok"
+        assert "version" in body
+        assert "storage_tasks_count" in body
+
+    def test_healthz_endpoint_content_type(self, client):
+        """Test HTTP healthz endpoint returns application/json content type."""
+        response = client.get("/healthz")
+        content_type = response.headers.get("content-type", "")
+        assert "application/json" in content_type
+
     def test_unknown_route_returns_404(self, client):
         """Test that unknown routes return 404."""
         response = client.get("/unknown")

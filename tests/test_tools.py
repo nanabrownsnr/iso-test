@@ -49,6 +49,71 @@ class TestHealthCheckTool:
         assert tool is not None
         assert tool.description == "Return the health status of the server."
 
+    def test_server_health_returns_version(self, mcp_server):
+        """Test server_health tool returns version info."""
+        @mcp_server.tool()
+        async def server_health() -> dict:
+            """Return detailed server health information."""
+            return {"status": "ok", "version": "0.1.0", "storage_tasks_count": 0, "registered_tools_count": 2}
+
+        result = asyncio.run(mcp_server.call_tool("server_health", {}))
+        assert result.structured_content["status"] == "ok"
+        assert result.structured_content["version"] == "0.1.0"
+
+    def test_server_health_returns_tool_count(self, mcp_server):
+        """Test server_health tool returns registered tools count."""
+        @mcp_server.tool()
+        async def server_health() -> dict:
+            """Return detailed server health information."""
+            return {"status": "ok", "version": "0.1.0", "storage_tasks_count": 0, "registered_tools_count": 2}
+
+        result = asyncio.run(mcp_server.call_tool("server_health", {}))
+        assert result.structured_content["registered_tools_count"] == 2
+
+    def test_server_health_tool_has_description(self, mcp_server):
+        """Test server_health tool has a description."""
+        @mcp_server.tool()
+        async def server_health() -> dict:
+            """Return detailed server health information."""
+            return {"status": "ok"}
+
+        tool = asyncio.run(mcp_server.get_tool("server_health"))
+        assert tool is not None
+        assert len(tool.description) > 0
+
+
+class TestServerHealthTool:
+    def test_server_health_returns_ok(self):
+        """Test server_health tool returns status ok with details."""
+        result = asyncio.run(mcp.call_tool("server_health", {}))
+        assert result.structured_content["status"] == "ok"
+        assert "version" in result.structured_content
+        assert result.structured_content["version"] == "0.1.0"
+        assert "storage_tasks_count" in result.structured_content
+        assert "registered_tools_count" in result.structured_content
+
+    def test_server_health_tool_registered(self):
+        """Test server_health tool is registered in the server."""
+        tools = asyncio.run(mcp.list_tools())
+        tool_names = [t.name for t in tools]
+        assert "server_health" in tool_names
+
+    def test_server_health_tool_description(self):
+        """Test server_health tool has a description."""
+        tool = asyncio.run(mcp.get_tool("server_health"))
+        assert tool is not None
+        assert len(tool.description) > 0
+
+    def test_server_health_includes_version(self):
+        """Test server_health tool returns the correct version."""
+        result = asyncio.run(mcp.call_tool("server_health", {}))
+        assert result.structured_content["version"] == "0.1.0"
+
+    def test_server_health_includes_tool_count(self):
+        """Test server_health tool includes registered tools count."""
+        result = asyncio.run(mcp.call_tool("server_health", {}))
+        assert result.structured_content["registered_tools_count"] >= 7
+
 
 class TestEchoTool:
     def test_echo_returns_message(self, mcp_server):

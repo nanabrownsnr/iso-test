@@ -848,6 +848,8 @@ class TestToolRegistration:
         tool_names = {t.name for t in tools}
         expected = {
             "health_check",
+            "server_health",
+            "system_health",
             "echo",
             "create_task",
             "get_task",
@@ -857,6 +859,11 @@ class TestToolRegistration:
             "task_summary",
         }
         assert tool_names == expected
+
+    def test_server_health_tool_has_description(self):
+        tool = asyncio.run(mcp.get_tool("server_health"))
+        assert tool is not None
+        assert "detailed" in tool.description.lower() or "health" in tool.description.lower()
 
     def test_create_task_tool_has_description(self):
         tool = asyncio.run(mcp.get_tool("create_task"))
