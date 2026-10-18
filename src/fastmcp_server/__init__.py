@@ -1,2 +1,3 @@
-def main() -> None:
-    print("Hello from fastmcp-server!")
+from .server import main
+
+__all__ = ["main"]
