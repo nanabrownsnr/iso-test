@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
@@ -33,6 +33,21 @@ class TaskPriority(str, Enum):
             )
 
 
+def _normalize_to_utc(value: datetime | str | None) -> datetime | None:
+    """Normalize a datetime to UTC.
+
+    - Naive datetimes (no tzinfo) are interpreted as UTC.
+    - Timezone-aware datetimes are converted to UTC preserving the instant.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 class Task(BaseModel):
     """A task in the task management system."""
 
@@ -43,6 +58,7 @@ class Task(BaseModel):
     status: TaskStatus = Field(description="Task status")
     created_at: datetime = Field(description="Task creation timestamp (UTC)")
     updated_at: datetime = Field(description="Task last update timestamp (UTC)")
+    due_at: datetime | None = Field(default=None, description="Task due date (UTC)")
 
     @field_validator("title")
     @classmethod
@@ -51,9 +67,14 @@ class Task(BaseModel):
             raise ValueError("Title must not be blank")
         return v.strip()
 
+    @field_validator("created_at", "updated_at", "due_at")
+    @classmethod
+    def due_at_normalize_utc(cls, v: datetime | str | None) -> datetime | None:
+        return _normalize_to_utc(v)
+
     def to_dict(self) -> dict:
         """Convert task to a plain dict for JSON serialization."""
-        return {
+        result: dict = {
             "id": self.id,
             "title": self.title,
             "description": self.description,
@@ -62,6 +83,9 @@ class Task(BaseModel):
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
+        if self.due_at is not None:
+            result["due_at"] = self.due_at.isoformat()
+        return result
 
 
 class CreateTaskRequest(BaseModel):
@@ -71,6 +95,7 @@ class CreateTaskRequest(BaseModel):
     description: str = Field(default="", description="Task description")
     priority: str = Field(description="Task priority: low, medium, or high")
     status: str = Field(default="todo", description="Task status: todo, in_progress, or done")
+    due_at: str | None = Field(default=None, description="Task due date in ISO 8601 format (UTC)")
 
     @field_validator("title")
     @classmethod

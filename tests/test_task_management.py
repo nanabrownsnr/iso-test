@@ -911,3 +911,190 @@ class TestHTTPHealthEndpoint:
     def test_health_endpoint_rejects_post(self, client):
         response = client.post("/health")
         assert response.status_code == 405
+
+
+# ---------------------------------------------------------------------------
+# Regression tests - due_at timestamp handling
+# ---------------------------------------------------------------------------
+
+
+class TestDueAtTimestampHandling:
+    """Regression tests for due_at timestamp normalization to UTC.
+
+    These tests verify that:
+    1. Naive ISO timestamps are interpreted as UTC
+    2. Timezone-aware timestamps preserve their instant correctly
+    3. No due_at means no due_at in the response
+    """
+
+    def test_normalize_to_utc_naive_interpreted_as_utc(self):
+        from datetime import UTC as dt_utc
+
+        from fastmcp_server.models import _normalize_to_utc
+
+        naive = "2025-06-15T14:30:00"
+        result = _normalize_to_utc(naive)
+        assert result is not None
+        assert result.tzinfo is not None
+        assert result.tzinfo == dt_utc
+        assert result.year == 2025
+        assert result.month == 6
+        assert result.day == 15
+        assert result.hour == 14
+        assert result.minute == 30
+
+    def test_normalize_to_utc_aware_preserves_instant(self):
+        from datetime import UTC as dt_utc
+
+        from fastmcp_server.models import _normalize_to_utc
+
+        # 14:30 in +05:00 timezone is 09:30 UTC
+        aware = "2025-06-15T14:30:00+05:00"
+        result = _normalize_to_utc(aware)
+        assert result is not None
+        assert result.tzinfo == dt_utc
+        assert result.hour == 9
+        assert result.minute == 30
+
+    def test_normalize_to_utc_aware_minus_offset(self):
+        from datetime import UTC as dt_utc
+
+        from fastmcp_server.models import _normalize_to_utc
+
+        # 14:30 in -03:00 timezone is 17:30 UTC
+        aware = "2025-06-15T14:30:00-03:00"
+        result = _normalize_to_utc(aware)
+        assert result is not None
+        assert result.tzinfo == dt_utc
+        assert result.hour == 17
+        assert result.minute == 30
+
+    def test_normalize_to_utc_none(self):
+        from fastmcp_server.models import _normalize_to_utc
+
+        assert _normalize_to_utc(None) is None
+
+    def test_normalize_to_utc_already_utc(self):
+        from datetime import UTC as dt_utc
+        from datetime import datetime
+
+        from fastmcp_server.models import _normalize_to_utc
+
+        dt = datetime(2025, 6, 15, 14, 30, 0, tzinfo=dt_utc)
+        result = _normalize_to_utc(dt)
+        assert result is dt
+        assert result.tzinfo == dt_utc
+
+    def test_task_model_naive_due_at_normalized(self):
+        from datetime import UTC as dt_utc
+
+        from fastmcp_server.models import Task, TaskPriority, TaskStatus
+
+        task = Task(
+            id="abc123",
+            title="Test task",
+            description="A test task",
+            priority=TaskPriority.HIGH,
+            status=TaskStatus.TODO,
+            created_at="2025-01-01T00:00:00+00:00",
+            updated_at="2025-01-01T00:00:00+00:00",
+            due_at="2025-06-15T14:30:00",
+        )
+        assert task.due_at is not None
+        assert task.due_at.tzinfo == dt_utc
+        assert task.due_at.hour == 14
+        assert task.due_at.minute == 30
+
+    def test_task_model_aware_due_at_preserved(self):
+        from datetime import UTC as dt_utc
+
+        from fastmcp_server.models import Task, TaskPriority, TaskStatus
+
+        task = Task(
+            id="abc123",
+            title="Test task",
+            description="A test task",
+            priority=TaskPriority.HIGH,
+            status=TaskStatus.TODO,
+            created_at="2025-01-01T00:00:00+00:00",
+            updated_at="2025-01-01T00:00:00+00:00",
+            due_at="2025-06-15T14:30:00+05:00",
+        )
+        assert task.due_at is not None
+        assert task.due_at.tzinfo == dt_utc
+        # 14:30 +05:00 = 09:30 UTC
+        assert task.due_at.hour == 9
+        assert task.due_at.minute == 30
+
+    def test_task_to_dict_includes_due_at(self):
+        from fastmcp_server.models import Task, TaskPriority, TaskStatus
+
+        task = Task(
+            id="abc123",
+            title="Test task",
+            description="A test task",
+            priority=TaskPriority.HIGH,
+            status=TaskStatus.TODO,
+            created_at="2025-01-01T00:00:00+00:00",
+            updated_at="2025-01-01T00:00:00+00:00",
+            due_at="2025-06-15T14:30:00+00:00",
+        )
+        d = task.to_dict()
+        assert "due_at" in d
+        assert d["due_at"] == "2025-06-15T14:30:00+00:00"
+
+    def test_task_to_dict_without_due_at(self):
+        from fastmcp_server.models import Task, TaskPriority, TaskStatus
+
+        task = Task(
+            id="abc123",
+            title="Test task",
+            description="A test task",
+            priority=TaskPriority.HIGH,
+            status=TaskStatus.TODO,
+            created_at="2025-01-01T00:00:00+00:00",
+            updated_at="2025-01-01T00:00:00+00:00",
+        )
+        d = task.to_dict()
+        assert "due_at" not in d
+
+    def test_create_task_tool_with_due_at(self):
+        result = asyncio.run(mcp.call_tool("create_task", {
+            "title": "Task with due date",
+            "description": "Has a due_at",
+            "priority": "high",
+            "status": "todo",
+            "due_at": "2025-12-31T23:59:59+00:00",
+        }))
+        assert result.structured_content["due_at"] == "2025-12-31T23:59:59+00:00"
+
+    def test_create_task_tool_naive_due_at_normalized(self):
+        result = asyncio.run(mcp.call_tool("create_task", {
+            "title": "Task with naive due date",
+            "description": "Naive timestamp should be UTC",
+            "priority": "medium",
+            "status": "todo",
+            "due_at": "2025-07-04T12:00:00",
+        }))
+        # Naive should be normalized to UTC with +00:00 suffix
+        assert result.structured_content["due_at"] == "2025-07-04T12:00:00+00:00"
+
+    def test_create_task_tool_aware_due_at_converted(self):
+        result = asyncio.run(mcp.call_tool("create_task", {
+            "title": "Task with aware due date",
+            "description": "Timezone-aware timestamp converted to UTC",
+            "priority": "low",
+            "status": "in_progress",
+            "due_at": "2025-07-04T20:00:00+08:00",
+        }))
+        # 20:00 +08:00 = 12:00 UTC
+        assert result.structured_content["due_at"] == "2025-07-04T12:00:00+00:00"
+
+    def test_create_task_tool_without_due_at(self):
+        result = asyncio.run(mcp.call_tool("create_task", {
+            "title": "Task without due date",
+            "description": "No due_at provided",
+            "priority": "low",
+            "status": "todo",
+        }))
+        assert "due_at" not in result.structured_content

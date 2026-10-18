@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from .models import Task, TaskPriority, TaskStatus
+from .models import Task, TaskPriority, TaskStatus, _normalize_to_utc
 
 
 class InMemoryTaskStorage:
@@ -18,8 +18,10 @@ class InMemoryTaskStorage:
         description: str,
         priority: TaskPriority,
         status: TaskStatus,
+        due_at: datetime | None = None,
     ) -> Task:
         now = datetime.now(UTC)
+        normalized_due_at = _normalize_to_utc(due_at) if due_at is not None else None
         task = Task(
             id=str(uuid.uuid4()),
             title=title,
@@ -28,6 +30,7 @@ class InMemoryTaskStorage:
             status=status,
             created_at=now,
             updated_at=now,
+            due_at=normalized_due_at,
         )
         self._tasks[task.id] = task
         return task

@@ -10,6 +10,7 @@ from .models import (
     TaskPriority,
     TaskStatus,
     UpdateTaskRequest,
+    _normalize_to_utc,
 )
 from .storage import get_storage
 
@@ -47,7 +48,7 @@ async def health_endpoint(request: Request) -> JSONResponse:
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
-async def create_task(title: str, description: str, priority: str, status: str) -> dict:
+async def create_task(title: str, description: str, priority: str, status: str, due_at: str | None = None) -> dict:
     """Create a new task with the given title, description, priority, and status.
 
     Args:
@@ -55,12 +56,13 @@ async def create_task(title: str, description: str, priority: str, status: str) 
         description: Task description.
         priority: Task priority – one of ``low``, ``medium``, ``high``.
         status: Task status – one of ``todo``, ``in_progress``, ``done``.
+        due_at: Task due date in ISO 8601 format (naive interpreted as UTC, aware preserved).
 
     Returns:
         The created task with all fields including generated ``id`` and timestamps.
     """
     # Validate via Pydantic model
-    request = CreateTaskRequest(title=title, description=description, priority=priority, status=status)
+    request = CreateTaskRequest(title=title, description=description, priority=priority, status=status, due_at=due_at)
 
     storage = get_storage()
     task = storage.create(
@@ -68,6 +70,7 @@ async def create_task(title: str, description: str, priority: str, status: str) 
         description=request.description,
         priority=TaskPriority(request.priority),
         status=TaskStatus(request.status),
+        due_at=_normalize_to_utc(request.due_at) if request.due_at else None,
     )
     return task.to_dict()
 
