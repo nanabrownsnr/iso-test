@@ -43,6 +43,18 @@ async def health_endpoint(request: Request) -> JSONResponse:
 
 
 # ---------------------------------------------------------------------------
+# HTTP API endpoints
+# ---------------------------------------------------------------------------
+
+@mcp.custom_route("/api/v1/tasks/count", methods=["GET"])
+async def task_count_endpoint(request: Request) -> JSONResponse:
+    """Return the total number of tasks as a typed JSON response."""
+    storage = get_storage()
+    total = len(storage.get_all())
+    return JSONResponse(content={"count": total})
+
+
+# ---------------------------------------------------------------------------
 # Task management tools
 # ---------------------------------------------------------------------------
 
