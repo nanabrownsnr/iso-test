@@ -1,6 +1,7 @@
 import pytest
 from starlette.testclient import TestClient
 
+from fastmcp_server import SERVICE_VERSION
 from fastmcp_server.server import mcp
 
 
@@ -19,7 +20,9 @@ class TestHTTPHealthEndpoint:
     def test_health_endpoint_response_body(self, client):
         """Test HTTP health endpoint returns correct JSON body."""
         response = client.get("/health")
-        assert response.json() == {"status": "ok"}
+        body = response.json()
+        assert body["status"] == "ok"
+        assert body["version"] == SERVICE_VERSION
 
     def test_health_endpoint_content_type(self, client):
         """Test HTTP health endpoint returns application/json content type."""
@@ -46,3 +49,30 @@ class TestHTTPHealthEndpoint:
         """Test that unknown routes return 404."""
         response = client.get("/unknown")
         assert response.status_code == 404
+
+    def test_health_endpoint_includes_version(self, client):
+        """Test HTTP health endpoint includes a stable service version."""
+        response = client.get("/health")
+        assert response.status_code == 200
+        body = response.json()
+        assert "version" in body
+        assert body["version"] == SERVICE_VERSION
+
+    def test_health_version_is_stable_string(self, client):
+        """Test that the version field is a non-empty string."""
+        response = client.get("/health")
+        body = response.json()
+        assert isinstance(body["version"], str)
+        assert len(body["version"]) > 0
+
+    def test_health_version_matches_package_version(self, client):
+        """Test that the version matches the SERVICE_VERSION constant."""
+        response = client.get("/health")
+        body = response.json()
+        assert body["version"] == SERVICE_VERSION
+
+    def test_health_endpoint_preserves_status_field(self, client):
+        """Test that the health endpoint still returns status: ok."""
+        response = client.get("/health")
+        body = response.json()
+        assert body["status"] == "ok"

@@ -4,6 +4,7 @@ import pytest
 from fastmcp import FastMCP
 from starlette.testclient import TestClient
 
+from fastmcp_server import SERVICE_VERSION
 from fastmcp_server.server import mcp
 
 
@@ -21,7 +22,7 @@ def mcp_server():
     @server.tool()
     async def health_check() -> dict:
         """Return the health status of the server."""
-        return {"status": "ok"}
+        return {"status": "ok", "version": SERVICE_VERSION}
 
     @server.tool()
     async def echo(message: str) -> dict:
@@ -35,7 +36,26 @@ class TestHealthCheckTool:
     def test_health_check_returns_ok(self, mcp_server):
         """Test health_check tool returns status ok."""
         result = asyncio.run(mcp_server.call_tool("health_check", {}))
-        assert result.structured_content == {"status": "ok"}
+        assert result.structured_content["status"] == "ok"
+
+    def test_health_check_includes_version(self, mcp_server):
+        """Test health_check tool includes a stable service version."""
+        result = asyncio.run(mcp_server.call_tool("health_check", {}))
+        body = result.structured_content
+        assert "version" in body
+        assert body["version"] == SERVICE_VERSION
+
+    def test_health_check_version_matches_constant(self, mcp_server):
+        """Test health_check tool version matches the package SERVICE_VERSION."""
+        result = asyncio.run(mcp_server.call_tool("health_check", {}))
+        body = result.structured_content
+        assert body["version"] == SERVICE_VERSION
+
+    def test_health_check_still_returns_status_ok(self, mcp_server):
+        """Test health_check tool preserves existing status field."""
+        result = asyncio.run(mcp_server.call_tool("health_check", {}))
+        body = result.structured_content
+        assert body["status"] == "ok"
 
     def test_health_check_tool_registered(self, mcp_server):
         """Test health_check tool is registered in the server."""
@@ -90,7 +110,9 @@ class TestHTTPHealthEndpoint:
         """Test HTTP health endpoint returns status ok."""
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        body = response.json()
+        assert body["status"] == "ok"
+        assert body["version"] == SERVICE_VERSION
 
     def test_health_endpoint_content_type(self, client):
         """Test HTTP health endpoint returns JSON content type."""

@@ -12,6 +12,7 @@ from .models import (
     UpdateTaskRequest,
 )
 from .storage import get_storage
+from .version import SERVICE_VERSION
 
 mcp = FastMCP(name="fastmcp-server")
 
@@ -23,7 +24,7 @@ mcp = FastMCP(name="fastmcp-server")
 @mcp.tool()
 async def health_check() -> dict:
     """Return the health status of the server."""
-    return {"status": "ok"}
+    return {"status": "ok", "version": SERVICE_VERSION}
 
 
 @mcp.tool()
@@ -39,7 +40,7 @@ async def echo(message: str) -> dict:
 @mcp.custom_route("/health", methods=["GET"])
 async def health_endpoint(request: Request) -> JSONResponse:
     """HTTP health check endpoint."""
-    return JSONResponse(content={"status": "ok"})
+    return JSONResponse(content={"status": "ok", "version": SERVICE_VERSION})
 
 
 # ---------------------------------------------------------------------------

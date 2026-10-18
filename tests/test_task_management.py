@@ -5,6 +5,7 @@ import pytest
 from fastmcp.exceptions import ToolError
 from starlette.testclient import TestClient
 
+from fastmcp_server import SERVICE_VERSION
 from fastmcp_server.models import (
     CreateTaskRequest,
     ListTaskFilters,
@@ -902,7 +903,9 @@ class TestHTTPHealthEndpoint:
     def test_health_endpoint(self, client):
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        body = response.json()
+        assert body["status"] == "ok"
+        assert body["version"] == SERVICE_VERSION
 
     def test_health_endpoint_content_type(self, client):
         response = client.get("/health")
