@@ -1,0 +1,25 @@
+[project]
+name = "fastmcp-server"
+version = "0.1.0"
+description = "A minimal production-quality FastMCP server"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp>=4.1.1",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9.1.1",
+    "httpx>=0.28.1",
+]
+dev = [
+    "pytest>=9.1.1",
+    "httpx>=0.28.1",
+]
+
+[project.scripts]
+fastmcp-server = "fastmcp_server.server:main"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
