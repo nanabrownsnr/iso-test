@@ -1,8 +1,7 @@
 import asyncio
+
 import pytest
-import httpx
 from fastmcp import FastMCP
-from fastmcp.server.server import FunctionTool
 from starlette.testclient import TestClient
 
 from fastmcp_server.server import mcp
